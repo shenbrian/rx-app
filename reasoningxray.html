@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReasoningXray</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, sans-serif; background: #f2f2f7; color: #1c1c1e; padding: 20px; }
+h1 { font-size: 26px; font-weight: 700; margin-bottom: 6px; padding-top: 40px; }
+p.sub { font-size: 14px; color: #6e6e73; margin-bottom: 20px; }
+.nav { display: flex; gap: 10px; margin-bottom: 24px; }
+.nav a { flex: 1; display: block; text-align: center; padding: 12px 6px; background: white; border-radius: 10px; text-decoration: none; color: #6e6e73; font-size: 14px; border: 2px solid transparent; }
+.nav a.on { color: #007aff; border-color: #007aff; font-weight: 600; }
+.btn { display: block; width: 100%; padding: 16px; border-radius: 12px; font-size: 16px; font-weight: 600; text-align: center; text-decoration: none; margin-top: 10px; }
+.btn-dark { background: #1c1c1e; color: white; }
+.btn-outline { background: white; color: #1c1c1e; border: 1px solid #c6c6c8; }
+.btn-red { background: white; color: #ff3b30; border: 1px solid #c6c6c8; }
+.card { display: block; background: white; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; text-decoration: none; color: inherit; }
+.lbl { font-size: 11px; font-weight: 600; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+.val { font-size: 15px; line-height: 1.6; }
+.field { background: white; border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+.srow { background: white; padding: 14px 16px; margin-bottom: 2px; border-radius: 10px; }
+.slbl { font-size: 13px; color: #6e6e73; margin-bottom: 6px; }
+.srow input { width: 100%; padding: 10px; border: 1px solid #d1d1d6; border-radius: 8px; font-size: 14px; font-family: monospace; }
+.ok { color: #34c759; text-align: center; padding: 8px; font-size: 14px; min-height: 28px; }
+.ring-area { text-align: center; padding: 30px 0; }
+.ring { width: 110px; height: 110px; border-radius: 55px; border: 3px solid #d1d1d6; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; }
+.dot { width: 48px; height: 48px; border-radius: 24px; background: #ff3b30; }
+.rec-lbl { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+.rec-hint { font-size: 14px; color: #6e6e73; line-height: 1.5; }
+.inputs { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.inputs input { padding: 12px; border: 1px solid #d1d1d6; border-radius: 10px; font-size: 16px; background: white; width: 100%; }
+.back { display: inline-block; color: #007aff; font-size: 16px; text-decoration: none; margin-bottom: 12px; padding-top: 40px; }
+</style>
+</head>
+<body>
+
+<a class="back" href="#" id="back-link" style="display:none">‹ Back</a>
+
+<!-- VISITS PAGE -->
+<div id="pg-visits">
+  <h1>My visits</h1>
+  <p class="sub">Your consultation record</p>
+  <div class="nav">
+    <a href="#" class="on" onclick="showPage('visits');return false;">🗂 Visits</a>
+    <a href="#" onclick="showPage('timeline');return false;">📈 Timeline</a>
+    <a href="#" onclick="showPage('settings');return false;">⚙️ Settings</a>
+  </div>
+  <div id="visits-list"></div>
+  <a href="#" class="btn btn-dark" onclick="showPage('record');return false;">+ New visit</a>
+</div>
+
+<!-- TIMELINE PAGE -->
+<div id="pg-timeline" style="display:none">
+  <h1>Timeline</h1>
+  <p class="sub">How your case has evolved</p>
+  <div class="nav">
+    <a href="#" onclick="showPage('visits');return false;">🗂 Visits</a>
+    <a href="#" class="on" onclick="showPage('timeline');return false;">📈 Timeline</a>
+    <a href="#" onclick="showPage('settings');return false;">⚙️ Settings</a>
+  </div>
+  <div id="timeline-list"></div>
+</div>
+
+<!-- SETTINGS PAGE -->
+<div id="pg-settings" style="display:none">
+  <h1>Settings</h1>
+  <p class="sub">Keys stored on this device only</p>
+  <div class="nav">
+    <a href="#" onclick="showPage('visits');return false;">🗂 Visits</a>
+    <a href="#" onclick="showPage('timeline');return false;">📈 Timeline</a>
+    <a href="#" class="on" onclick="showPage('settings');return false;">⚙️ Settings</a>
+  </div>
+  <div class="srow"><div class="slbl">OpenAI API key</div><input type="password" id="oai-key" placeholder="sk-..." autocorrect="off" autocapitalize="none"></div>
+  <div class="srow"><div class="slbl">Claude API key</div><input type="password" id="ant-key" placeholder="sk-ant-..." autocorrect="off" autocapitalize="none"></div>
+  <a href="#" class="btn btn-dark" onclick="saveKeys();return false;">Save keys</a>
+  <div class="ok" id="save-ok"></div>
+  <a href="#" class="btn btn-red" onclick="clearData();return false;">Clear all visits</a>
+</div>
+
+<!-- RECORD PAGE -->
+<div id="pg-record" style="display:none">
+  <a class="back" href="#" onclick="showPage('visits');return false;">‹ Back to visits</a>
+  <h1>New visit</h1>
+  <p class="sub">Record your consultation</p>
+  <div class="inputs">
+    <input type="text" id="doc-name" placeholder="Doctor's name (optional)">
+    <input type="text" id="clinic-name" placeholder="Clinic name (optional)">
+  </div>
+  <div class="ring-area">
+    <a href="#" onclick="toggleRec();return false;">
+      <div class="ring" id="ring"><div class="dot" id="dot"></div></div>
+    </a>
+    <div class="rec-lbl" id="rec-lbl">Tap the circle to start</div>
+    <div id="rec-timer" style="font-size:36px;font-weight:300;margin:10px 0;display:none">0:00</div>
+    <div class="rec-hint" id="rec-hint">Place your phone on the desk during the consultation. Recording stays private on your device.</div>
+  </div>
+</div>
+
+<!-- PROCESSING PAGE -->
+<div id="pg-processing" style="display:none">
+  <h1>Processing</h1>
+  <p class="sub" id="proc-sub">Transcribing your visit...</p>
+  <div style="margin:30px 0;background:white;border-radius:12px;padding:20px;text-align:center;">
+    <div id="proc-lbl" style="font-size:16px;font-weight:600;margin-bottom:12px;">Converting audio to text</div>
+    <div style="width:100%;height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;">
+      <div id="prog" style="height:100%;background:#1c1c1e;border-radius:3px;width:0%;transition:width 0.5s;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY PAGE -->
+<div id="pg-summary" style="display:none">
+  <a class="back" href="#" onclick="showPage('visits');return false;" style="display:block">‹ All visits</a>
+  <h1 id="sum-title" style="padding-top:10px;">Visit summary</h1>
+  <p class="sub" id="sum-date"></p>
+  <div style="height:16px;"></div>
+  <div id="sum-body"></div>
+</div>
+
+<script>
+const FIELDS=[
+  {key:'reason',lbl:'Why you came in'},
+  {key:'explanation',lbl:'What the doctor thinks'},
+  {key:'evidence',lbl:'What led to that conclusion'},
+  {key:'decision',lbl:'What was decided'},
+  {key:'next_step',lbl:'What to watch for'},
+  {key:'questions',lbl:'Questions for next visit'}
+];
+
+const PAGES=['visits','timeline','settings','record','processing','summary'];
+let visits=[],recording=false,mediaRec=null,chunks=[],ticker=null,secs=0;
+
+function showPage(name){
+  PAGES.forEach(p=>{ const el=document.getElementById('pg-'+p); if(el) el.style.display='none'; });
+  const pg=document.getElementById('pg-'+name);
+  if(pg) pg.style.display='block';
+  window.scrollTo(0,0);
+}
+
+function load(){
+  try{visits=JSON.parse(localStorage.getItem('visits')||'[]');}catch(e){visits=[];}
+  const ok=localStorage.getItem('oai')||'';
+  const ak=localStorage.getItem('ant')||'';
+  if(ok)document.getElementById('oai-key').value=ok;
+  if(ak)document.getElementById('ant-key').value=ak;
+  renderVisits();
+  renderTimeline();
+}
+
+function saveV(){localStorage.setItem('visits',JSON.stringify(visits));}
+
+function saveKeys(){
+  const ok=document.getElementById('oai-key').value.trim();
+  const ak=document.getElementById('ant-key').value.trim();
+  if(ok)localStorage.setItem('oai',ok);
+  if(ak)localStorage.setItem('ant',ak);
+  const el=document.getElementById('save-ok');
+  el.textContent='Keys saved successfully.';
+  setTimeout(()=>el.textContent='',2500);
+}
+
+function clearData(){
+  if(confirm('Delete all visits? This cannot be undone.')){
+    visits=[];saveV();renderVisits();renderTimeline();
+  }
+}
+
+function renderVisits(){
+  const b=document.getElementById('visits-list');
+  if(!visits.length){b.innerHTML='<p style="text-align:center;color:#6e6e73;padding:30px 0;">No visits yet.</p>';return;}
+  b.innerHTML=visits.slice().reverse().map((v,ri)=>{
+    const i=visits.length-1-ri;
+    return `<a class="card" href="#" onclick="openVisit(${i});return false;">
+      <div style="font-size:12px;color:#6e6e73;">${v.date} · ${v.doctor}</div>
+      <div style="font-size:16px;font-weight:600;margin:4px 0 2px;">${v.fields.reason||'Visit'}</div>
+      <div style="font-size:13px;color:#6e6e73;">${v.clinic||''}</div>
+    </a>`;
+  }).join('');
+}
+
+function renderTimeline(){
+  const b=document.getElementById('timeline-list');
+  if(!visits.length){b.innerHTML='<p style="text-align:center;color:#6e6e73;padding:30px 0;">No visits yet.</p>';return;}
+  b.innerHTML=visits.slice().reverse().map((v,ri)=>{
+    const i=visits.length-1-ri;
+    return `<div style="display:flex;gap:12px;margin-bottom:18px;">
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <div style="width:10px;height:10px;border-radius:5px;background:#1c1c1e;flex-shrink:0;margin-top:3px;"></div>
+        ${ri<visits.length-1?'<div style="width:1px;background:#d1d1d6;flex:1;margin-top:3px;"></div>':''}
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:12px;color:#6e6e73;">${v.date} · ${v.doctor}</div>
+        <a href="#" onclick="openVisit(${i});return false;" style="font-size:15px;font-weight:600;color:#007aff;text-decoration:none;display:block;margin:3px 0;">${v.fields.reason||'Visit'}</a>
+        <div style="font-size:13px;color:#6e6e73;line-height:1.4;">${v.fields.explanation||''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openVisit(i){
+  const v=visits[i];
+  document.getElementById('sum-title').textContent=v.fields.reason||'Visit summary';
+  document.getElementById('sum-date').textContent=`${v.date} · ${v.doctor}${v.clinic?' · '+v.clinic:''}`;
+  let h=FIELDS.map(f=>`<div class="field"><div class="lbl">${f.lbl}</div><div class="val">${v.fields[f.key]||'—'}</div></div>`).join('');
+  h+=`<a href="#" class="btn btn-outline" onclick="shareVisit(${i});return false;" style="margin-top:10px;">Share this summary</a>`;
+  document.getElementById('sum-body').innerHTML=h;
+  showPage('summary');
+}
+
+function shareVisit(i){
+  const v=visits[i];
+  const txt=`My visit — ${v.date}\nDoctor: ${v.doctor}\n\n`+FIELDS.map(f=>f.lbl.toUpperCase()+'\n'+(v.fields[f.key]||'—')).join('\n\n');
+  if(navigator.share)navigator.share({title:'Visit summary',text:txt});
+  else navigator.clipboard.writeText(txt).then(()=>alert('Copied to clipboard.'));
+}
+
+async function toggleRec(){
+  if(!recording){
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      mediaRec=new MediaRecorder(stream);
+      chunks=[];
+      mediaRec.ondataavailable=e=>chunks.push(e.data);
+      mediaRec.start();
+      recording=true;
+      document.getElementById('ring').style.borderColor='#ff3b30';
+      document.getElementById('dot').style.borderRadius='8px';
+      document.getElementById('dot').style.width='36px';
+      document.getElementById('dot').style.height='36px';
+      document.getElementById('rec-lbl').textContent='Recording — tap to stop';
+      document.getElementById('rec-timer').style.display='block';
+      document.getElementById('rec-hint').textContent='Recording in progress. Tap the circle when the visit ends.';
+      secs=0;
+      ticker=setInterval(()=>{
+        secs++;
+        const m=Math.floor(secs/60),s=secs%60;
+        document.getElementById('rec-timer').textContent=m+':'+(s<10?'0':'')+s;
+      },1000);
+    }catch(e){alert('Microphone access needed. Please allow it in Safari settings.');}
+  } else {
+    clearInterval(ticker);
+    recording=false;
+    mediaRec.stop();
+    mediaRec.onstop=async()=>{
+      const blob=new Blob(chunks,{type:'audio/webm'});
+      mediaRec.stream.getTracks().forEach(t=>t.stop());
+      document.getElementById('ring').style.borderColor='#d1d1d6';
+      document.getElementById('dot').style.borderRadius='24px';
+      document.getElementById('dot').style.width='48px';
+      document.getElementById('dot').style.height='48px';
+      document.getElementById('rec-lbl').textContent='Tap the circle to start';
+      document.getElementById('rec-timer').style.display='none';
+      showPage('processing');
+      await processVisit(blob);
+    };
+  }
+}
+
+function setProc(lbl,sub,pct){
+  document.getElementById('proc-lbl').textContent=lbl;
+  document.getElementById('proc-sub').textContent=sub;
+  document.getElementById('prog').style.width=pct+'%';
+}
+
+async function processVisit(blob){
+  const ok=localStorage.getItem('oai')||'';
+  const ak=localStorage.getItem('ant')||'';
+  if(!ok||!ak){alert('Please add your API keys in Settings first.');showPage('visits');return;}
+  try{
+    setProc('Converting audio to text...','Transcribing',20);
+    const fd=new FormData();
+    fd.append('file',blob,'visit.webm');
+    fd.append('model','whisper-1');
+    fd.append('language','en');
+    const wr=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{'Authorization':'Bearer '+ok},body:fd});
+    if(!wr.ok)throw new Error('Transcription failed: '+await wr.text());
+    const transcript=(await wr.json()).text;
+    setProc('Identifying key moments...','Reading the conversation',55);
+    const prompt=`You are ReasoningXray. Convert this doctor-patient consultation transcript into a clear reasoning structure the patient can understand.
+RULE: Do not change what was said. Only restructure into plain language.
+Return ONLY valid JSON with exactly these 6 fields:
+{"reason":"Why the patient came in","explanation":"The doctor's main reasoning in plain language","evidence":"What the doctor used to reach their conclusion","decision":"What was decided","next_step":"What the patient should watch for or do next","questions":"2 to 3 suggested questions for the next visit"}
+Transcript:\n${transcript}`;
+    setProc('Building your summary...','Structuring the reasoning',75);
+    const cr=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':ak,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    if(!cr.ok)throw new Error('Reasoning failed: '+await cr.text());
+    const cd=await cr.json();
+    const fields=JSON.parse(cd.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
+    setProc('Done.','',100);
+    const doctor=document.getElementById('doc-name').value.trim();
+    const clinic=document.getElementById('clinic-name').value.trim();
+    document.getElementById('doc-name').value='';
+    document.getElementById('clinic-name').value='';
+    visits.push({id:Date.now(),date:new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}),doctor:doctor||'Doctor',clinic,transcript,fields});
+    saveV();renderVisits();renderTimeline();
+    setTimeout(()=>openVisit(visits.length-1),300);
+  }catch(err){
+    alert('Error: '+err.message+'\n\nCheck your API keys in Settings.');
+    showPage('visits');
+  }
+}
+
+load();
+</script>
+</body>
+</html>
