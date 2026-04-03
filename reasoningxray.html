@@ -126,6 +126,8 @@ const FIELDS=[
   {key:'evidence',lbl:'What led to that conclusion'},
   {key:'decision',lbl:'What was decided'},
   {key:'next_step',lbl:'What to watch for'},
+  {key:'confidenceLevel',lbl:'How certain the doctor was'},
+  {key:'confidenceReason',lbl:'What indicated that'},
   {key:'questions',lbl:'Questions for next visit'}
 ];
 
@@ -314,6 +316,8 @@ Return ONLY valid JSON with exactly these 6 fields. No preamble, no markdown, no
   "evidence": "What led to that conclusion, written to you directly (e.g. 'Your lungs sounded clear and you had no fever, which suggests...')",
   "decision": "What was decided, written to you directly (e.g. 'No antibiotics for now because...')",
   "next_step": "Warning signs to watch for, written to you directly (e.g. 'Come back if you develop a fever over 38 degrees or if...')",
+  "confidenceLevel": "How certain the doctor appeared: use exactly 'high', 'moderate', or 'low' — based only on the language the doctor used",
+  "confidenceReason": "One sentence explaining what the doctor said that indicates this confidence level (e.g. 'The doctor used the word probably and said they wanted to rule something out before deciding')",
   "questions": ["Question 1 for next visit", "Question 2 for next visit", "Question 3 for next visit"]
 }
 
