@@ -40,7 +40,7 @@ p.sub { font-size: 14px; color: #6e6e73; margin-bottom: 20px; }
 
 <!-- VISITS PAGE -->
 <div id="pg-visits">
-  <h1>My visits</h1>
+  <h1>My visits 2</h1>
   <p class="sub">Your consultation record</p>
   <div class="nav">
     <a href="#" class="on" onclick="showPage('visits');return false;">🗂 Visits</a>
@@ -203,7 +203,18 @@ function openVisit(i){
   const v=visits[i];
   document.getElementById('sum-title').textContent=v.fields.reason||'Visit summary';
   document.getElementById('sum-date').textContent=`${v.date} · ${v.doctor}${v.clinic?' · '+v.clinic:''}`;
-  let h=FIELDS.map(f=>`<div class="field"><div class="lbl">${f.lbl}</div><div class="val">${v.fields[f.key]||'—'}</div></div>`).join('');
+  let h=FIELDS.map(f=>{
+  let val;
+  if(f.key==='questions'){
+    const qs=v.fields[f.key];
+    val=Array.isArray(qs)
+      ? qs.map(q=>`<div style="padding:6px 0;border-bottom:1px solid #f2f2f7;">${q}</div>`).join('')
+      : qs||'—';
+  } else {
+    val=v.fields[f.key]||'—';
+  }
+  return `<div class="field"><div class="lbl">${f.lbl}</div><div class="val">${val}</div></div>`;
+}).join('');
   h+=`<a href="#" class="btn btn-outline" onclick="shareVisit(${i});return false;" style="margin-top:10px;">Share this summary</a>`;
   document.getElementById('sum-body').innerHTML=h;
   showPage('summary');
@@ -211,7 +222,12 @@ function openVisit(i){
 
 function shareVisit(i){
   const v=visits[i];
-  const txt=`My visit — ${v.date}\nDoctor: ${v.doctor}\n\n`+FIELDS.map(f=>f.lbl.toUpperCase()+'\n'+(v.fields[f.key]||'—')).join('\n\n');
+  const txt=`My visit — ${v.date}\nDoctor: ${v.doctor}\n\n`+FIELDS.map(f=>{
+  const val=f.key==='questions'&&Array.isArray(v.fields[f.key])
+    ? v.fields[f.key].map((q,i)=>`${i+1}. ${q}`).join('\n')
+    : v.fields[f.key]||'—';
+  return f.lbl.toUpperCase()+'\n'+val;
+}).join('\n\n');
   if(navigator.share)navigator.share({title:'Visit summary',text:txt});
   else navigator.clipboard.writeText(txt).then(()=>alert('Copied to clipboard.'));
 }
@@ -278,11 +294,31 @@ async function processVisit(blob){
     if(!wr.ok)throw new Error('Transcription failed: '+await wr.text());
     const transcript=(await wr.json()).text;
     setProc('Identifying key moments...','Reading the conversation',55);
-    const prompt=`You are ReasoningXray. Convert this doctor-patient consultation transcript into a clear reasoning structure the patient can understand.
-RULE: Do not change what was said. Only restructure into plain language.
-Return ONLY valid JSON with exactly these 6 fields:
-{"reason":"Why the patient came in","explanation":"The doctor's main reasoning in plain language","evidence":"What the doctor used to reach their conclusion","decision":"What was decided","next_step":"What the patient should watch for or do next","questions":"2 to 3 suggested questions for the next visit"}
-Transcript:\n${transcript}`;
+    const prompt = `You are ReasoningXray. Your job is to extract the doctor's clinical reasoning from a real consultation recording and convert it into plain language a patient can understand.
+
+THE INPUT is a transcript of a live doctor-patient conversation. It will be messy, interleaved, and may include interruptions, incomplete sentences, and off-topic exchanges. That is normal.
+
+YOUR CORE RULE: Only extract what the doctor actually said. Do not interpret, infer, diagnose, or add meaning that was not spoken. If the doctor did not say it, do not include it. If a field has insufficient signal from the transcript, write exactly: "Not enough information in this consultation."
+
+IMPORTANT DISTINCTIONS:
+- "decision" = what the doctor decided to do (e.g. prescribed medication, ordered a test, recommended rest)
+- "next_step" = warning signs or symptoms the patient should watch for, as stated by the doctor (e.g. "come back if you develop a fever")
+- These are different. Do not repeat the decision in next_step.
+
+HEDGING LANGUAGE: Preserve the doctor's uncertainty faithfully. If the doctor said "probably", "most likely", "I think", "let's just keep an eye on it" — keep that language. Do not make the doctor sound more certain than they were.
+
+Return ONLY valid JSON with exactly these 6 fields. No preamble, no markdown, no explanation:
+{
+  "reason": "Why you came in, written directly to the patient (e.g. 'You came in because...')",
+  "explanation": "What the doctor thinks, written directly to the patient (e.g. 'The doctor thinks...' or 'Most likely...'). Preserve any uncertainty the doctor expressed.",
+  "evidence": "What led to that conclusion, written directly to the patient (e.g. 'The doctor listened to your chest and...')",
+  "decision": "What was decided, written directly to the patient (e.g. 'The doctor decided not to prescribe...')",
+  "next_step": "What to watch for, written directly to the patient as instructions (e.g. 'Come back if you develop...')",
+  "questions": ["Question 1 for next visit", "Question 2 for next visit", "Question 3 for next visit"]
+}
+
+Transcript:
+${transcript}`;
     setProc('Building your summary...','Structuring the reasoning',75);
     const cr=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':ak,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
     if(!cr.ok)throw new Error('Reasoning failed: '+await cr.text());
