@@ -147,7 +147,11 @@ function load(){
   const ok=localStorage.getItem('oai')||'';
   const ak=localStorage.getItem('ant')||'';
   if(ok)document.getElementById('oai-key').value=ok;
-  if(ak)document.getElementById('ant-key').value=ak;
+if(ak)document.getElementById('ant-key').value=ak;
+const dd=localStorage.getItem('defaultDoctor')||'';
+const dc=localStorage.getItem('defaultClinic')||'';
+if(dd)document.getElementById('default-doctor').value=dd;
+if(dc)document.getElementById('default-clinic').value=dc;
   renderVisits();
   renderTimeline();
 }
@@ -159,9 +163,13 @@ function saveKeys(){
   const ak=document.getElementById('ant-key').value.trim();
   if(ok)localStorage.setItem('oai',ok);
   if(ak)localStorage.setItem('ant',ak);
-  const el=document.getElementById('save-ok');
-  el.textContent='Keys saved successfully.';
-  setTimeout(()=>el.textContent='',2500);
+  const dd=document.getElementById('default-doctor').value.trim();
+const dc=document.getElementById('default-clinic').value.trim();
+if(dd)localStorage.setItem('defaultDoctor',dd);
+if(dc)localStorage.setItem('defaultClinic',dc);
+const el=document.getElementById('save-ok');
+el.textContent='Keys saved successfully.';
+setTimeout(()=>el.textContent='',2500);
 }
 
 function clearData(){
@@ -345,8 +353,8 @@ ${transcript}`;
     const cd=await cr.json();
     const fields=JSON.parse(cd.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
     setProc('Done.','',100);
-    const doctor=document.getElementById('doc-name').value.trim();
-    const clinic=document.getElementById('clinic-name').value.trim();
+    const doctor=document.getElementById('doc-name').value.trim()||localStorage.getItem('defaultDoctor')||'Doctor';
+    const clinic=document.getElementById('clinic-name').value.trim()||localStorage.getItem('defaultClinic')||'';
     document.getElementById('doc-name').value='';
     document.getElementById('clinic-name').value='';
     visits.push({id:Date.now(),date:new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}),doctor:doctor||'Doctor',clinic,transcript,fields});
