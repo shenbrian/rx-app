@@ -128,6 +128,7 @@ const FIELDS=[
   {key:'next_step',lbl:'What to watch for'},
   {key:'confidenceLevel',lbl:'How certain the doctor was'},
   {key:'confidenceReason',lbl:'What indicated that'},
+  {key:'reasoningMovement',lbl:'Where the diagnosis is heading'},
   {key:'questions',lbl:'Questions for next visit'}
 ];
 
@@ -318,6 +319,7 @@ Return ONLY valid JSON with exactly these 6 fields. No preamble, no markdown, no
   "next_step": "Warning signs to watch for, written to you directly (e.g. 'Come back if you develop a fever over 38 degrees or if...')",
   "confidenceLevel": "How certain the doctor appeared: use exactly 'high', 'moderate', or 'low' — based only on the language the doctor used",
   "confidenceReason": "One sentence explaining what the doctor said that indicates this confidence level (e.g. 'The doctor used the word probably and said they wanted to rule something out before deciding')",
+  "reasoningMovement": "One of exactly these seven values: confirming, narrowing, reopened, monitoring, escalating, resolving, unknown — choose the one that best describes where the doctor's thinking is in this consultation",
   "questions": ["Question 1 for next visit", "Question 2 for next visit", "Question 3 for next visit"]
 }
 
