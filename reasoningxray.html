@@ -43,8 +43,6 @@ p.sub { font-size: 14px; color: #6e6e73; margin-bottom: 20px; }
   <h1>My visits 2</h1>
   <p class="sub">Your consultation record</p>
   <div class="nav">
-  <div class="srow"><div class="slbl">Your doctor's name</div><input type="text" id="default-doctor" placeholder="Dr Smith" autocorrect="off"></div>
-  <div class="srow"><div class="slbl">Clinic name</div><input type="text" id="default-clinic" placeholder="City Medical" autocorrect="off"></div>
     <a href="#" class="on" onclick="showPage('visits');return false;">🗂 Visits</a>
     <a href="#" onclick="showPage('timeline');return false;">📈 Timeline</a>
     <a href="#" onclick="showPage('settings');return false;">⚙️ Settings</a>
@@ -78,6 +76,8 @@ p.sub { font-size: 14px; color: #6e6e73; margin-bottom: 20px; }
   <div class="srow"><div class="slbl">Claude API key</div><input type="password" id="ant-key" placeholder="sk-ant-..." autocorrect="off" autocapitalize="none"></div>
   <a href="#" class="btn btn-dark" onclick="saveKeys();return false;">Save keys</a>
   <div class="ok" id="save-ok"></div>
+  <div class="srow"><div class="slbl">Your doctor's name</div><input type="text" id="default-doctor" placeholder="Dr Smith" autocorrect="off"></div>
+  <div class="srow"><div class="slbl">Clinic name</div><input type="text" id="default-clinic" placeholder="City Medical" autocorrect="off"></div>
   <a href="#" class="btn btn-red" onclick="clearData();return false;">Clear all visits</a>
 </div>
 
