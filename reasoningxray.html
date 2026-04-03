@@ -309,11 +309,11 @@ HEDGING LANGUAGE: Preserve the doctor's uncertainty faithfully. If the doctor sa
 
 Return ONLY valid JSON with exactly these 6 fields. No preamble, no markdown, no explanation:
 {
-  "reason": "Why you came in, written directly to the patient (e.g. 'You came in because...')",
-  "explanation": "What the doctor thinks, written directly to the patient (e.g. 'The doctor thinks...' or 'Most likely...'). Preserve any uncertainty the doctor expressed.",
-  "evidence": "What led to that conclusion, written directly to the patient (e.g. 'The doctor listened to your chest and...')",
-  "decision": "What was decided, written directly to the patient (e.g. 'The doctor decided not to prescribe...')",
-  "next_step": "What to watch for, written directly to the patient as instructions (e.g. 'Come back if you develop...')",
+  "reason": "Why you came in, written directly to you the patient (e.g. 'You came in because you have been...')",
+  "explanation": "What the doctor thinks, written to you directly (e.g. 'Most likely you have...' or 'The doctor thinks you may have...'). Preserve any uncertainty expressed.",
+  "evidence": "What led to that conclusion, written to you directly (e.g. 'Your lungs sounded clear and you had no fever, which suggests...')",
+  "decision": "What was decided, written to you directly (e.g. 'No antibiotics for now because...')",
+  "next_step": "Warning signs to watch for, written to you directly (e.g. 'Come back if you develop a fever over 38 degrees or if...')",
   "questions": ["Question 1 for next visit", "Question 2 for next visit", "Question 3 for next visit"]
 }
 
