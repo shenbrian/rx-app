@@ -218,7 +218,15 @@ function openVisit(i){
   }
   return `<div class="field"><div class="lbl">${f.lbl}</div><div class="val">${val}</div></div>`;
 }).join('');
-  h+=`<a href="#" class="btn btn-outline" onclick="shareVisit(${i});return false;" style="margin-top:10px;">Share this summary</a>`;
+  const pl=v.fields.patientLayer||{};
+if(pl.whatMightBeHappening){
+  h+=`<div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:0.05em;">What this means for you</div>`;
+  h+=`<div class="field"><div class="lbl">What might be happening</div><div class="val">${pl.whatMightBeHappening}</div></div>`;
+  h+=`<div class="field"><div class="lbl">How serious it appears</div><div class="val">${pl.howSeriousItAppears}</div></div>`;
+  h+=`<div class="field"><div class="lbl">What the doctor is doing</div><div class="val">${pl.whatTheDoctorIsDoing}</div></div>`;
+  h+=`<div class="field"><div class="lbl">What happens next</div><div class="val">${pl.whatHappensNext}</div></div>`;
+}
+h+=`<a href="#" class="btn btn-outline" onclick="shareVisit(${i});return false;" style="margin-top:10px;">Share this summary</a>`;
   document.getElementById('sum-body').innerHTML=h;
   showPage('summary');
 }
@@ -321,6 +329,12 @@ Return ONLY valid JSON with exactly these 6 fields. No preamble, no markdown, no
   "confidenceReason": "One sentence explaining what the doctor said that indicates this confidence level (e.g. 'The doctor used the word probably and said they wanted to rule something out before deciding')",
   "reasoningMovement": "One of exactly these seven values: confirming, narrowing, reopened, monitoring, escalating, resolving, unknown — choose the one that best describes where the doctor's thinking is in this consultation",
   "questions": ["Question 1 for next visit", "Question 2 for next visit", "Question 3 for next visit"]
+  "patientLayer": {
+    "whatMightBeHappening": "In one or two plain sentences, what the doctor thinks may be going on — written warmly and directly to the patient, preserving uncertainty",
+    "howSeriousItAppears": "A calm, honest one-sentence assessment of how urgent or concerning this appears based only on what the doctor said",
+    "whatTheDoctorIsDoing": "What the doctor's action or decision means in plain terms — why it makes sense",
+    "whatHappensNext": "What the patient should concretely expect to happen next, based only on what was said"
+  }
 }
 
 Transcript:
