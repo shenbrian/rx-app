@@ -39,6 +39,15 @@ p.sub { font-size: 14px; color: #6e6e73; margin-bottom: 20px; }
 .edit-btn { font-size: 11px; color: #007aff; text-decoration: none; margin-left: 8px; font-weight: 500; }
 .edit-area { width: 100%; min-height: 80px; padding: 10px; border: 1px solid #007aff; border-radius: 8px; font-size: 15px; font-family: -apple-system, sans-serif; line-height: 1.6; margin-top: 8px; resize: vertical; }
 .save-btn { display: inline-block; margin-top: 8px; padding: 8px 16px; background: #007aff; color: white; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; }
+
+@media print {
+  .nav, .btn, .back, #install-banner, .edit-btn, .save-btn { display: none !important; }
+  body { background: white; padding: 10px; }
+  .field { border: none; border-bottom: 1px solid #e0e0e0; border-radius: 0; margin-bottom: 8px; }
+  h1 { font-size: 20px; }
+  .lbl { color: #333; }
+  .val { color: #000; }
+}
 </style>
 </head>
 <body>
@@ -355,7 +364,10 @@ function renderSummary(i){
     h+=`<div class="field"><div class="lbl">What the doctor is doing</div><div class="val">${pl.whatTheDoctorIsDoing}</div></div>`;
     h+=`<div class="field"><div class="lbl">What happens next</div><div class="val">${pl.whatHappensNext}</div></div>`;
   }
-  h+=`<a href="#" class="btn btn-outline" onclick="shareVisit(${i});return false;" style="margin-top:10px;">Share this summary</a>`;
+  h+=`<div style="display:flex;gap:10px;margin-top:10px;">
+  <a href="#" class="btn btn-outline" onclick="shareVisit(${i});return false;" style="flex:1;">Share as text</a>
+  <a href="#" class="btn btn-outline" onclick="printVisit();return false;" style="flex:1;">Save as PDF</a>
+</div>`;
   document.getElementById('sum-body').innerHTML=h;
 }
 
@@ -432,6 +444,10 @@ async function toggleRec(){
       await processVisit(blob);
     };
   }
+}
+
+function printVisit(){
+  window.print();
 }
 
 function setProc(lbl,sub,pct){
