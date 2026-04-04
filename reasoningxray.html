@@ -141,6 +141,12 @@ function showPage(name){
   PAGES.forEach(p=>{ const el=document.getElementById('pg-'+p); if(el) el.style.display='none'; });
   const pg=document.getElementById('pg-'+name);
   if(pg) pg.style.display='block';
+  if(name==='record'){
+    const dd=localStorage.getItem('defaultDoctor')||'';
+    const dc=localStorage.getItem('defaultClinic')||'';
+    if(dd)document.getElementById('doc-name').value=dd;
+    if(dc)document.getElementById('clinic-name').value=dc;
+  }
   window.scrollTo(0,0);
 }
 
@@ -183,13 +189,26 @@ function clearData(){
 function renderVisits(){
   const b=document.getElementById('visits-list');
   if(!visits.length){b.innerHTML='<p style="text-align:center;color:#6e6e73;padding:30px 0;">No visits yet.</p>';return;}
-  b.innerHTML=visits.slice().reverse().map((v,ri)=>{
-    const i=visits.length-1-ri;
-    return `<a class="card" href="#" onclick="openVisit(${i});return false;">
-      <div style="font-size:12px;color:#6e6e73;">${v.date} · ${v.doctor}</div>
-      <div style="font-size:16px;font-weight:600;margin:4px 0 2px;">${v.fields.reason||'Visit'}</div>
-      <div style="font-size:13px;color:#6e6e73;">${v.clinic||''}</div>
-    </a>`;
+  
+  // Group visits by threadTag
+  const threads={};
+  visits.forEach((v,i)=>{
+    const tag=v.fields.threadTag||'other';
+    if(!threads[tag])threads[tag]=[];
+    threads[tag].push({v,i});
+  });
+  
+  b.innerHTML=Object.entries(threads).map(([tag,items])=>{
+    const latest=items[items.length-1];
+    const visits_html=items.slice().reverse().map(({v,i})=>`
+      <a class="card" href="#" onclick="openVisit(${i});return false;" style="margin-bottom:6px;">
+        <div style="font-size:12px;color:#6e6e73;">${v.date} · ${v.doctor}</div>
+        <div style="font-size:15px;margin:3px 0;">${v.fields.reason||'Visit'}</div>
+      </a>`).join('');
+    return `<div style="margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding:0 4px;">${tag}</div>
+      ${visits_html}
+    </div>`;
   }).join('');
 }
 
@@ -344,7 +363,8 @@ Return ONLY valid JSON with exactly these 6 fields. No preamble, no markdown, no
     "howSeriousItAppears": "A calm, honest one-sentence assessment of how urgent or concerning this appears based only on what the doctor said",
     "whatTheDoctorIsDoing": "What the doctor's action or decision means in plain terms — why it makes sense",
     "whatHappensNext": "What the patient should concretely expect to happen next, based only on what was said"
-  }
+  },
+  "threadTag": "A 2 to 4 word label identifying the clinical issue this visit belongs to — lowercase, no punctuation (e.g. 'persistent cough', 'headache and sleep', 'stomach infection'). Use the same label across visits if the issue is the same."
 }
 
 Transcript:
