@@ -36,6 +36,9 @@ p.sub { font-size: 14px; color: #6e6e73; margin-bottom: 20px; }
 .inputs { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
 .inputs input { padding: 12px; border: 1px solid #d1d1d6; border-radius: 10px; font-size: 16px; background: white; width: 100%; }
 .back { display: inline-block; color: #007aff; font-size: 16px; text-decoration: none; margin-bottom: 12px; padding-top: 40px; }
+.edit-btn { font-size: 11px; color: #007aff; text-decoration: none; margin-left: 8px; font-weight: 500; }
+.edit-area { width: 100%; min-height: 80px; padding: 10px; border: 1px solid #007aff; border-radius: 8px; font-size: 15px; font-family: -apple-system, sans-serif; line-height: 1.6; margin-top: 8px; resize: vertical; }
+.save-btn { display: inline-block; margin-top: 8px; padding: 8px 16px; background: #007aff; color: white; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -146,7 +149,7 @@ const FIELDS=[
 ];
 
 const PAGES=['visits','timeline','settings','record','processing','summary'];
-let visits=[],recording=false,mediaRec=null,chunks=[],ticker=null,secs=0;
+let visits=[],recording=false,mediaRec=null,chunks=[],ticker=null,secs=0,currentVisitIndex=-1;
 
 function showPage(name){
   PAGES.forEach(p=>{ const el=document.getElementById('pg-'+p); if(el) el.style.display='none'; });
@@ -320,33 +323,61 @@ function renderTimeline(){
 }
 
 function openVisit(i){
+  currentVisitIndex=i;
   const v=visits[i];
   document.getElementById('sum-title').textContent=v.fields.reason||'Visit summary';
   document.getElementById('sum-date').textContent=`${v.date} · ${v.doctor}${v.clinic?' · '+v.clinic:''}`;
-  let h=FIELDS.map(f=>{
-  let val;
-  if(f.key==='questions'){
-    const qs=v.fields[f.key];
-    val=Array.isArray(qs)
-      ? qs.map(q=>`<div style="padding:6px 0;border-bottom:1px solid #f2f2f7;">${q}</div>`).join('')
-      : qs||'—';
-  } else {
-    val=v.fields[f.key]||'—';
-  }
-  const badge=f.key==='explanation'?badgeHtml(v.fields):'';
-  return `<div class="field"><div class="lbl">${f.lbl}${badge}</div><div class="val">${val}</div></div>`;
-}).join('');
-  const pl=v.fields.patientLayer||{};
-if(pl.whatMightBeHappening){
-  h+=`<div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:0.05em;">What this means for you</div>`;
-  h+=`<div class="field"><div class="lbl">What might be happening</div><div class="val">${pl.whatMightBeHappening}</div></div>`;
-  h+=`<div class="field"><div class="lbl">How serious it appears</div><div class="val">${pl.howSeriousItAppears}</div></div>`;
-  h+=`<div class="field"><div class="lbl">What the doctor is doing</div><div class="val">${pl.whatTheDoctorIsDoing}</div></div>`;
-  h+=`<div class="field"><div class="lbl">What happens next</div><div class="val">${pl.whatHappensNext}</div></div>`;
-}
-h+=`<a href="#" class="btn btn-outline" onclick="shareVisit(${i});return false;" style="margin-top:10px;">Share this summary</a>`;
-  document.getElementById('sum-body').innerHTML=h;
+  renderSummary(i);
   showPage('summary');
+}
+
+function renderSummary(i){
+  const v=visits[i];
+  let h=FIELDS.map(f=>{
+    let val;
+    if(f.key==='questions'){
+      const qs=v.fields[f.key];
+      val=Array.isArray(qs)
+        ? qs.map(q=>`<div style="padding:6px 0;border-bottom:1px solid #f2f2f7;">${q}</div>`).join('')
+        : qs||'—';
+    } else {
+      val=v.fields[f.key]||'—';
+    }
+    const badge=f.key==='explanation'?badgeHtml(v.fields):'';
+    const editLink=`<a href="#" class="edit-btn" onclick="editField(${i},'${f.key}');return false;">Edit</a>`;
+    return `<div class="field" id="field-${f.key}"><div class="lbl">${f.lbl}${badge}${editLink}</div><div class="val" id="val-${f.key}">${val}</div></div>`;
+  }).join('');
+  const pl=v.fields.patientLayer||{};
+  if(pl.whatMightBeHappening){
+    h+=`<div style="margin:20px 0 10px;font-size:13px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:0.05em;">What this means for you</div>`;
+    h+=`<div class="field"><div class="lbl">What might be happening</div><div class="val">${pl.whatMightBeHappening}</div></div>`;
+    h+=`<div class="field"><div class="lbl">How serious it appears</div><div class="val">${pl.howSeriousItAppears}</div></div>`;
+    h+=`<div class="field"><div class="lbl">What the doctor is doing</div><div class="val">${pl.whatTheDoctorIsDoing}</div></div>`;
+    h+=`<div class="field"><div class="lbl">What happens next</div><div class="val">${pl.whatHappensNext}</div></div>`;
+  }
+  h+=`<a href="#" class="btn btn-outline" onclick="shareVisit(${i});return false;" style="margin-top:10px;">Share this summary</a>`;
+  document.getElementById('sum-body').innerHTML=h;
+}
+
+function editField(i,key){
+  const v=visits[i];
+  const current=Array.isArray(v.fields[key])?v.fields[key].join('\n'):v.fields[key]||'';
+  const valEl=document.getElementById('val-'+key);
+  valEl.innerHTML=`<textarea class="edit-area" id="edit-${key}">${current}</textarea><a href="#" class="save-btn" onclick="saveField(${i},'${key}');return false;">Save</a>`;
+}
+
+function saveField(i,key){
+  const newVal=document.getElementById('edit-'+key).value.trim();
+  if(Array.isArray(visits[i].fields[key])){
+    visits[i].fields[key]=newVal.split('\n').filter(l=>l.trim());
+  } else {
+    visits[i].fields[key]=newVal;
+  }
+  saveV();
+  renderSummary(i);
+  if(key==='reason'){
+    document.getElementById('sum-title').textContent=newVal;
+  }
 }
 
 function shareVisit(i){
