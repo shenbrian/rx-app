@@ -2,7 +2,11 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RxRay">
+<meta name="theme-color" content="#ffffff">
 <title>ReasoningXray</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,6 +39,13 @@ p.sub { font-size: 14px; color: #6e6e73; margin-bottom: 20px; }
 </style>
 </head>
 <body>
+
+<!-- INSTALL BANNER -->
+<div id="install-banner" style="display:none;background:#1c1c1e;color:white;padding:14px 16px;font-size:14px;line-height:1.5;position:relative;">
+  <div style="font-weight:600;margin-bottom:4px;">Add to your home screen</div>
+  <div style="color:#aeaeb2;">Tap <strong>Share</strong> then <strong>Add to Home Screen</strong> to use ReasoningXray like an app.</div>
+  <a href="#" onclick="dismissBanner();return false;" style="position:absolute;top:14px;right:16px;color:#aeaeb2;text-decoration:none;font-size:18px;">✕</a>
+</div>  
 
 <a class="back" href="#" id="back-link" style="display:none">‹ Back</a>
 
@@ -150,6 +161,11 @@ function showPage(name){
   window.scrollTo(0,0);
 }
 
+function dismissBanner(){
+  document.getElementById('install-banner').style.display='none';
+  localStorage.setItem('bannerDismissed','1');
+}
+
 function load(){
   try{visits=JSON.parse(localStorage.getItem('visits')||'[]');}catch(e){visits=[];}
   const ok=localStorage.getItem('oai')||'';
@@ -162,6 +178,9 @@ if(dd)document.getElementById('default-doctor').value=dd;
 if(dc)document.getElementById('default-clinic').value=dc;
   renderVisits();
   renderTimeline();
+const isStandalone=window.navigator.standalone===true;
+const bannerDismissed=localStorage.getItem('bannerDismissed')||'';
+if(!isStandalone&&!bannerDismissed)document.getElementById('install-banner').style.display='block';  
 }
 
 function saveV(){localStorage.setItem('visits',JSON.stringify(visits));}
