@@ -248,6 +248,24 @@ function computeTrajectory(threadVisits){
   return {overallPath,certaintyTrend,momentum,activeUncertainty};
 }
 
+function epistemicBadge(fields){
+  const movement=fields.reasoningMovement||'unknown';
+  const confidence=fields.confidenceLevel||'unknown';
+  if(movement==='confirming'&&confidence==='high')return{label:'stable',color:'#34c759'};
+  if(movement==='resolving')return{label:'stable',color:'#34c759'};
+  if(movement==='escalating')return{label:'evolving',color:'#ff9500'};
+  if(movement==='reopened')return{label:'evolving',color:'#ff9500'};
+  if(movement==='narrowing')return{label:'provisional',color:'#007aff'};
+  if(confidence==='low')return{label:'provisional',color:'#007aff'};
+  if(confidence==='high')return{label:'observed',color:'#34c759'};
+  return{label:'inferred',color:'#6e6e73'};
+}
+
+function badgeHtml(fields){
+  const b=epistemicBadge(fields);
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;color:white;background:${b.color};margin-left:8px;vertical-align:middle;">${b.label}</span>`;
+}
+
 function renderTimeline(){
   const b=document.getElementById('timeline-list');
   if(!visits.length){b.innerHTML='<p style="text-align:center;color:#6e6e73;padding:30px 0;">No visits yet.</p>';return;}
@@ -270,7 +288,7 @@ function renderTimeline(){
         </div>
         <div style="flex:1;">
           <div style="font-size:12px;color:#6e6e73;">${v.date} · ${v.doctor}</div>
-          <a href="#" onclick="openVisit(${i});return false;" style="font-size:15px;font-weight:600;color:#007aff;text-decoration:none;display:block;margin:2px 0;">${v.fields.reason||'Visit'}</a>
+          <a href="#" onclick="openVisit(${i});return false;" style="font-size:15px;font-weight:600;color:#007aff;text-decoration:none;display:block;margin:2px 0;">${v.fields.reason||'Visit'}${badgeHtml(v.fields)}</a>
           <div style="font-size:13px;color:#6e6e73;">${v.fields.explanation||''}</div>
         </div>
       </div>`).join('');
@@ -296,7 +314,8 @@ function openVisit(i){
   } else {
     val=v.fields[f.key]||'—';
   }
-  return `<div class="field"><div class="lbl">${f.lbl}</div><div class="val">${val}</div></div>`;
+  const badge=f.key==='explanation'?badgeHtml(v.fields):'';
+  return `<div class="field"><div class="lbl">${f.lbl}${badge}</div><div class="val">${val}</div></div>`;
 }).join('');
   const pl=v.fields.patientLayer||{};
 if(pl.whatMightBeHappening){
