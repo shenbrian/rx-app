@@ -369,6 +369,7 @@ function renderSummary(i){
   <a href="#" class="btn btn-outline" onclick="printVisit();return false;" style="flex:1;">Save as PDF</a>
 </div>`;
   document.getElementById('sum-body').innerHTML=h;
+  TRACK2.renderConsentPanel(visits[i].id);
 }
 
 function editField(i,key){
@@ -525,6 +526,274 @@ ${transcript}`;
 }
 
 load();
+
+// =============================================================
+// TRACK 2 — Patient-owned data layer
+// ReasoningXray | shenbrian/rx-app
+//
+// INSERT THIS ENTIRE BLOCK just before the closing </script>
+// tag in reasoningxray.html. Do not modify anything above it.
+// =============================================================
+
+const TRACK2 = (() => {
+
+  // ── Config ────────────────────────────────────────────────
+  const SUPABASE_URL = 'https://uycjryfejsdragagfred.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_I2Onn8nkLqED_NZzFEjSmw_KlGoYNOf';
+
+  // ── Anonymiser ────────────────────────────────────────────
+  // Runs entirely on-device before any data is transmitted.
+  function anonymise(fields) {
+    const doctorName = localStorage.getItem('defaultDoctor') || '';
+    const clinicName = localStorage.getItem('defaultClinic') || '';
+    const identifiers = [doctorName, clinicName].filter(s => s.trim() !== '');
+
+    let text = JSON.stringify(fields);
+
+    // 1. Strip known identifiers (case-insensitive)
+    identifiers.forEach(id => {
+      const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp(escaped, 'gi'), '[REDACTED]');
+    });
+
+    // 2. Strip dates
+    text = text.replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, '[DATE]');
+    text = text.replace(
+      /\b\d{1,2}\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/gi,
+      '[DATE]'
+    );
+    text = text.replace(
+      /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/gi,
+      '[DATE]'
+    );
+
+    // 3. Strip phone numbers
+    text = text.replace(/\b(\+?61|0)\d[\s\-]?\d{4}[\s\-]?\d{4}\b/g, '[PHONE]');
+
+    // 4. Strip Medicare / 10-digit IDs
+    text = text.replace(/\b\d{10}\b/g, '[ID]');
+
+    return JSON.parse(text);
+  }
+
+  // ── Contribution metadata ─────────────────────────────────
+  // Stored separately from visits so Track 1 is never touched.
+  // Keyed by visit id (the Date.now() timestamp).
+  function getMeta() {
+    try { return JSON.parse(localStorage.getItem('rx_contributions') || '{}'); }
+    catch { return {}; }
+  }
+
+  function saveMeta(meta) {
+    localStorage.setItem('rx_contributions', JSON.stringify(meta));
+  }
+
+  // ── UUID generator ────────────────────────────────────────
+  function uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  // ── Supabase POST ─────────────────────────────────────────
+  async function postToSupabase(payload) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/contributions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Supabase ${res.status}: ${err}`);
+    }
+  }
+
+  // ── Supabase DELETE ───────────────────────────────────────
+  async function deleteFromSupabase(contributionId) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/contributions?id=eq.${contributionId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+        },
+      }
+    );
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Supabase ${res.status}: ${err}`);
+    }
+  }
+
+  // ── Contribute ────────────────────────────────────────────
+  async function contributeVisit(visitId) {
+    const allVisits = JSON.parse(localStorage.getItem('visits') || '[]');
+    const visit = allVisits.find(v => v.id === visitId);
+    if (!visit || !visit.fields) throw new Error('Visit not found');
+
+    const anonFields = anonymise(visit.fields);
+    const contributionId = uuid();
+
+    await postToSupabase({
+      id: contributionId,
+      anonymised_summary: anonFields,
+      chief_complaint: anonFields.reason || null,
+    });
+
+    const meta = getMeta();
+    meta[visitId] = {
+      contributionId,
+      contributedAt: new Date().toISOString(),
+      status: 'contributed',
+    };
+    saveMeta(meta);
+    return contributionId;
+  }
+
+  // ── Revoke ────────────────────────────────────────────────
+  async function revokeContribution(visitId) {
+    const meta = getMeta();
+    const entry = meta[visitId];
+    if (!entry) throw new Error('No contribution for this visit');
+
+    await deleteFromSupabase(entry.contributionId);
+
+    meta[visitId].status = 'revoked';
+    saveMeta(meta);
+  }
+
+  // ── Render consent panel ──────────────────────────────────
+  function renderConsentPanel(visitId) {
+    const old = document.getElementById('t2-consent-panel');
+    if (old) old.remove();
+
+    const meta = getMeta();
+    const entry = meta[visitId];
+    const isContributed = entry && entry.status === 'contributed';
+    const isRevoked = entry && entry.status === 'revoked';
+
+    const panel = document.createElement('div');
+    panel.id = 't2-consent-panel';
+    panel.style.cssText = `
+      margin: 20px 0 8px;
+      padding: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fafafa;
+      font-size: 14px;
+    `;
+
+    if (isContributed) {
+      const dateStr = new Date(entry.contributedAt).toLocaleDateString('en-AU', {
+        day: 'numeric', month: 'long', year: 'numeric'
+      });
+      panel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span style="color:#22c55e;">✓</span>
+          <strong style="font-size:13px;">Contributed to research pool</strong>
+        </div>
+        <p style="margin:0 0 12px;color:#666;font-size:13px;line-height:1.5;">
+          Anonymised summary shared on ${dateStr}. You can withdraw it at any time.
+        </p>
+        <button id="t2-revoke-btn" style="background:none;border:1px solid #e5e7eb;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;color:#666;width:100%;">
+          Withdraw contribution
+        </button>
+      `;
+      panel.querySelector('#t2-revoke-btn').onclick = () => handleRevoke(visitId);
+
+    } else if (isRevoked) {
+      panel.innerHTML = `
+        <p style="margin:0;color:#999;font-size:13px;">
+          Contribution withdrawn. Your data has been deleted from the research pool.
+        </p>
+      `;
+
+    } else {
+      panel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <span>🔬</span>
+          <strong style="font-size:13px;">Contribute to research?</strong>
+        </div>
+        <p style="margin:0 0 8px;color:#444;font-size:13px;line-height:1.5;">
+          Share an anonymised version of this summary to help researchers understand how GPs reason through consultations.
+        </p>
+        <ul style="margin:0 0 14px 18px;color:#666;font-size:13px;line-height:1.9;">
+          <li>Your name, doctor's name, and dates are removed before anything leaves your device</li>
+          <li>Only the structured six-point summary is shared — not the audio or transcript</li>
+          <li>You can withdraw this at any time</li>
+          <li>The app works identically whether you contribute or not</li>
+        </ul>
+        <button id="t2-contribute-btn" style="background:#1c1c1e;color:#fff;border:none;border-radius:10px;padding:12px 16px;font-size:14px;font-weight:500;cursor:pointer;width:100%;">
+          Contribute this visit
+        </button>
+      `;
+      panel.querySelector('#t2-contribute-btn').onclick = () => handleContribute(visitId);
+    }
+
+    // Insert immediately after sum-body
+    const sumBody = document.getElementById('sum-body');
+    if (sumBody && sumBody.parentNode) {
+      sumBody.parentNode.insertBefore(panel, sumBody.nextSibling);
+    }
+  }
+
+  // ── Handlers ──────────────────────────────────────────────
+  async function handleContribute(visitId) {
+    const btn = document.getElementById('t2-contribute-btn');
+    if (btn) { btn.textContent = 'Contributing…'; btn.disabled = true; }
+    try {
+      await contributeVisit(visitId);
+      renderConsentPanel(visitId);
+    } catch (err) {
+      console.error('[Track2]', err);
+      if (btn) { btn.textContent = 'Failed — tap to retry'; btn.disabled = false; }
+      alert('Something went wrong connecting to the research pool. Check your connection and try again.');
+    }
+  }
+
+  async function handleRevoke(visitId) {
+    if (!confirm('Withdraw your contribution? This permanently deletes your anonymised summary from the research pool.')) return;
+    const btn = document.getElementById('t2-revoke-btn');
+    if (btn) { btn.textContent = 'Withdrawing…'; btn.disabled = true; }
+    try {
+      await revokeContribution(visitId);
+      renderConsentPanel(visitId);
+    } catch (err) {
+      console.error('[Track2]', err);
+      if (btn) { btn.textContent = 'Failed — tap to retry'; btn.disabled = false; }
+      alert('Something went wrong. Please try again.');
+    }
+  }
+
+  // ── Public API ────────────────────────────────────────────
+  return {
+    renderConsentPanel,
+    anonymise,
+    contributeVisit,
+    revokeContribution,
+  };
+
+})();
+
+// =============================================================
+// HOW TO HOOK INTO TRACK 1
+//
+// In renderSummary(i), change this line:
+//   document.getElementById('sum-body').innerHTML=h;
+//
+// To this:
+//   document.getElementById('sum-body').innerHTML=h;
+//   TRACK2.renderConsentPanel(visits[i].id);
+//
+// That is the only change to Track 1 code.
+// =============================================================
 </script>
 </body>
 </html>
