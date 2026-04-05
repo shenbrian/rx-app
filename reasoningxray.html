@@ -370,6 +370,7 @@ function renderSummary(i){
 </div>`;
   document.getElementById('sum-body').innerHTML=h;
   TRACK2.renderConsentPanel(visits[i].id);
+  VALIDATOR.renderValidateButton(i);
 }
 
 function editField(i,key){
@@ -794,6 +795,420 @@ const TRACK2 = (() => {
 //
 // That is the only change to Track 1 code.
 // =============================================================
+
+// =============================================================
+// TRACK 2 — Step 5: Extraction Validator
+// ReasoningXray | shenbrian/rx-app
+//
+// WHAT THIS DOES:
+// Adds a "Validate extraction" button to each visit summary.
+// Opens a side-by-side panel: transcript on the left,
+// six-point extraction on the right. You mark each field
+// as accurate, partial, or missed. Ratings stored in
+// localStorage under 'rx_validation'. Nothing leaves device.
+//
+// HOW TO INSTALL:
+// 1. Paste this entire block just before the closing </script>
+//    tag (after the TRACK2 block already there).
+// 2. In renderSummary(i), after the TRACK2.renderConsentPanel
+//    line, add:
+//      VALIDATOR.renderValidateButton(i);
+//
+// =============================================================
+
+const VALIDATOR = (() => {
+
+  const RATINGS = ['accurate', 'partial', 'missed'];
+
+  const RATING_LABELS = {
+    accurate: '✓ Accurate',
+    partial:  '~ Partial',
+    missed:   '✗ Missed',
+  };
+
+  const RATING_COLORS = {
+    accurate: '#22c55e',
+    partial:  '#f59e0b',
+    missed:   '#ef4444',
+  };
+
+  // ── Storage ───────────────────────────────────────────────
+  function getValidations() {
+    try { return JSON.parse(localStorage.getItem('rx_validation') || '{}'); }
+    catch { return {}; }
+  }
+
+  function saveValidations(v) {
+    localStorage.setItem('rx_validation', JSON.stringify(v));
+  }
+
+  function getVisit(i) {
+    const visits = JSON.parse(localStorage.getItem('visits') || '[]');
+    return visits[i] || null;
+  }
+
+  // ── Field definitions matching Track 1 ───────────────────
+  const FIELDS = [
+    { key: 'reason',            lbl: 'Why you came in' },
+    { key: 'explanation',       lbl: 'What the doctor thinks' },
+    { key: 'evidence',          lbl: 'What led to that conclusion' },
+    { key: 'decision',          lbl: 'What was decided' },
+    { key: 'next_step',         lbl: 'What to watch for' },
+    { key: 'questions',         lbl: 'Questions for next visit' },
+  ];
+
+  // ── Render validate button ────────────────────────────────
+  function renderValidateButton(visitIndex) {
+    const old = document.getElementById('t2-validate-btn-wrap');
+    if (old) old.remove();
+
+    const visit = getVisit(visitIndex);
+    if (!visit) return;
+
+    const validations = getValidations();
+    const existing = validations[visit.id];
+    const isValidated = existing && existing.completedAt;
+
+    const wrap = document.createElement('div');
+    wrap.id = 't2-validate-btn-wrap';
+    wrap.style.cssText = 'margin: 8px 0;';
+
+    const btn = document.createElement('button');
+    btn.style.cssText = `
+      background: none;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #444;
+      width: 100%;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `;
+
+    if (isValidated) {
+      const scores = summariseScores(existing.ratings);
+      btn.innerHTML = `<span>📋</span> <span>Validation complete — ${scores}</span>`;
+    } else {
+      btn.innerHTML = `<span>📋</span> <span>Validate this extraction</span>`;
+    }
+
+    btn.onclick = () => openValidator(visitIndex);
+    wrap.appendChild(btn);
+
+    // Insert after the consent panel
+    const consentPanel = document.getElementById('t2-consent-panel');
+    if (consentPanel && consentPanel.parentNode) {
+      consentPanel.parentNode.insertBefore(wrap, consentPanel.nextSibling);
+    } else {
+      const sumBody = document.getElementById('sum-body');
+      if (sumBody && sumBody.parentNode) {
+        sumBody.parentNode.appendChild(wrap);
+      }
+    }
+  }
+
+  function summariseScores(ratings) {
+    if (!ratings) return '';
+    const counts = { accurate: 0, partial: 0, missed: 0 };
+    Object.values(ratings).forEach(r => { if (counts[r] !== undefined) counts[r]++; });
+    const parts = [];
+    if (counts.accurate) parts.push(`${counts.accurate} accurate`);
+    if (counts.partial)  parts.push(`${counts.partial} partial`);
+    if (counts.missed)   parts.push(`${counts.missed} missed`);
+    return parts.join(', ');
+  }
+
+  // ── Open validator overlay ────────────────────────────────
+  function openValidator(visitIndex) {
+    const visit = getVisit(visitIndex);
+    if (!visit) return;
+
+    // Remove any existing overlay
+    const old = document.getElementById('t2-validator-overlay');
+    if (old) old.remove();
+
+    const validations = getValidations();
+    const existing = validations[visit.id] || { ratings: {}, notes: {} };
+
+    const overlay = document.createElement('div');
+    overlay.id = 't2-validator-overlay';
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #fff;
+      z-index: 9999;
+      overflow-y: auto;
+      font-size: 14px;
+    `;
+
+    // ── Header ──
+    const header = document.createElement('div');
+    header.style.cssText = `
+      position: sticky;
+      top: 0;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 1;
+    `;
+    header.innerHTML = `
+      <strong style="font-size:15px;">Validate extraction</strong>
+      <button id="t2-validator-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#666;padding:0 4px;">✕</button>
+    `;
+    overlay.appendChild(header);
+
+    // ── Transcript block ──
+    const transcriptWrap = document.createElement('div');
+    transcriptWrap.style.cssText = `
+      margin: 16px 16px 0;
+      padding: 14px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+    `;
+    transcriptWrap.innerHTML = `
+      <div style="font-size:11px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Original transcript</div>
+      <div style="font-size:13px;line-height:1.7;color:#333;white-space:pre-wrap;max-height:200px;overflow-y:auto;">${visit.transcript || '— No transcript stored —'}</div>
+    `;
+    overlay.appendChild(transcriptWrap);
+
+    // ── Instructions ──
+    const instructions = document.createElement('div');
+    instructions.style.cssText = 'padding: 12px 16px 4px; color: #666; font-size: 13px;';
+    instructions.textContent = 'For each extracted field, rate how accurately it reflects what was said in the transcript.';
+    overlay.appendChild(instructions);
+
+    // ── Field ratings ──
+    FIELDS.forEach(field => {
+      const fieldVal = visit.fields[field.key];
+      const displayVal = Array.isArray(fieldVal)
+        ? fieldVal.join('\n')
+        : (fieldVal || '— not extracted —');
+
+      const currentRating = existing.ratings[field.key] || null;
+      const currentNote = existing.notes[field.key] || '';
+
+      const fieldBlock = document.createElement('div');
+      fieldBlock.style.cssText = `
+        margin: 12px 16px 0;
+        padding: 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fff;
+      `;
+
+      fieldBlock.innerHTML = `
+        <div style="font-size:11px;font-weight:700;color:#6e6e73;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">${field.lbl}</div>
+        <div style="font-size:13px;line-height:1.6;color:#333;margin-bottom:12px;padding:8px;background:#f8f9fa;border-radius:6px;">${displayVal}</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;" id="rating-btns-${field.key}">
+          ${RATINGS.map(r => `
+            <button
+              data-field="${field.key}"
+              data-rating="${r}"
+              style="
+                flex:1;
+                padding:8px 4px;
+                border-radius:8px;
+                border: 1.5px solid ${currentRating === r ? RATING_COLORS[r] : '#e5e7eb'};
+                background: ${currentRating === r ? RATING_COLORS[r] + '18' : '#fff'};
+                color: ${currentRating === r ? RATING_COLORS[r] : '#666'};
+                font-size:12px;
+                font-weight: ${currentRating === r ? '600' : '400'};
+                cursor:pointer;
+              "
+            >${RATING_LABELS[r]}</button>
+          `).join('')}
+        </div>
+        <input
+          type="text"
+          placeholder="Optional note (e.g. missed medication dose)"
+          value="${currentNote}"
+          data-field="${field.key}"
+          style="
+            width:100%;
+            box-sizing:border-box;
+            border:1px solid #e5e7eb;
+            border-radius:8px;
+            padding:8px 10px;
+            font-size:13px;
+            color:#333;
+            outline:none;
+          "
+        />
+      `;
+
+      overlay.appendChild(fieldBlock);
+    });
+
+    // ── Save button ──
+    const saveWrap = document.createElement('div');
+    saveWrap.style.cssText = 'padding: 16px;';
+    saveWrap.innerHTML = `
+      <button id="t2-validator-save" style="
+        background:#1c1c1e;
+        color:#fff;
+        border:none;
+        border-radius:10px;
+        padding:14px 16px;
+        font-size:14px;
+        font-weight:500;
+        cursor:pointer;
+        width:100%;
+      ">Save validation</button>
+      <div id="t2-validator-status" style="text-align:center;font-size:13px;color:#666;margin-top:10px;min-height:18px;"></div>
+    `;
+    overlay.appendChild(saveWrap);
+
+    document.body.appendChild(overlay);
+
+    // ── Wire up close ──
+    document.getElementById('t2-validator-close').onclick = () => {
+      overlay.remove();
+      renderValidateButton(visitIndex);
+    };
+
+    // ── Wire up rating buttons ──
+    overlay.querySelectorAll('[data-rating]').forEach(btn => {
+      btn.onclick = () => {
+        const field = btn.dataset.field;
+        const rating = btn.dataset.rating;
+        // Update button styles in this group
+        overlay.querySelectorAll(`[data-field="${field}"][data-rating]`).forEach(b => {
+          const r = b.dataset.rating;
+          const selected = r === rating;
+          b.style.border = `1.5px solid ${selected ? RATING_COLORS[r] : '#e5e7eb'}`;
+          b.style.background = selected ? RATING_COLORS[r] + '18' : '#fff';
+          b.style.color = selected ? RATING_COLORS[r] : '#666';
+          b.style.fontWeight = selected ? '600' : '400';
+        });
+      };
+    });
+
+    // ── Wire up save ──
+    document.getElementById('t2-validator-save').onclick = () => {
+      const ratings = {};
+      const notes = {};
+
+      // Collect ratings
+      FIELDS.forEach(field => {
+        const group = overlay.querySelectorAll(`[data-field="${field.key}"][data-rating]`);
+        group.forEach(btn => {
+          if (btn.style.fontWeight === '600') {
+            ratings[field.key] = btn.dataset.rating;
+          }
+        });
+        // Collect notes
+        const noteInput = overlay.querySelector(`input[data-field="${field.key}"]`);
+        if (noteInput && noteInput.value.trim()) {
+          notes[field.key] = noteInput.value.trim();
+        }
+      });
+
+      const ratedCount = Object.keys(ratings).length;
+      if (ratedCount === 0) {
+        document.getElementById('t2-validator-status').textContent = 'Rate at least one field before saving.';
+        return;
+      }
+
+      // Save
+      const allValidations = getValidations();
+      allValidations[visit.id] = {
+        visitId: visit.id,
+        visitDate: visit.date,
+        ratings,
+        notes,
+        completedAt: new Date().toISOString(),
+        fieldCount: ratedCount,
+      };
+      saveValidations(allValidations);
+
+      const status = document.getElementById('t2-validator-status');
+      const saveBtn = document.getElementById('t2-validator-save');
+      saveBtn.textContent = 'Saved ✓';
+      saveBtn.style.background = '#22c55e';
+      status.textContent = `${ratedCount} of ${FIELDS.length} fields rated.`;
+
+      setTimeout(() => {
+        overlay.remove();
+        renderValidateButton(visitIndex);
+      }, 1200);
+    };
+  }
+
+  // ── Summary report (call from console) ───────────────────
+  // VALIDATOR.report() — prints accuracy stats across all visits
+  function report() {
+    const validations = getValidations();
+    const entries = Object.values(validations);
+    if (!entries.length) {
+      console.log('[Validator] No validations recorded yet.');
+      return;
+    }
+
+    const totals = { accurate: 0, partial: 0, missed: 0, unrated: 0 };
+    const byField = {};
+
+    FIELDS.forEach(f => {
+      byField[f.key] = { accurate: 0, partial: 0, missed: 0, unrated: 0, lbl: f.lbl };
+    });
+
+    entries.forEach(entry => {
+      FIELDS.forEach(f => {
+        const r = entry.ratings[f.key];
+        if (r && totals[r] !== undefined) {
+          totals[r]++;
+          byField[f.key][r]++;
+        } else {
+          totals.unrated++;
+          byField[f.key].unrated++;
+        }
+      });
+    });
+
+    const total = totals.accurate + totals.partial + totals.missed;
+    const pct = n => total ? Math.round(n / total * 100) + '%' : '—';
+
+    console.log(`\n[Validator] Summary across ${entries.length} validated visit(s)`);
+    console.log(`Overall: ${pct(totals.accurate)} accurate | ${pct(totals.partial)} partial | ${pct(totals.missed)} missed\n`);
+    console.log('By field:');
+    FIELDS.forEach(f => {
+      const fd = byField[f.key];
+      const ft = fd.accurate + fd.partial + fd.missed;
+      const fp = n => ft ? Math.round(n / ft * 100) + '%' : '—';
+      console.log(`  ${f.lbl}: ${fp(fd.accurate)} acc | ${fp(fd.partial)} part | ${fp(fd.missed)} miss`);
+    });
+    console.log('');
+
+    return { totals, byField, visitCount: entries.length };
+  }
+
+  return {
+    renderValidateButton,
+    openValidator,
+    report,
+  };
+
+})();
+
+// =============================================================
+// HOW TO HOOK INTO TRACK 1
+//
+// In renderSummary(i), after the existing TRACK2 hook line:
+//   TRACK2.renderConsentPanel(visits[i].id);
+//
+// Add exactly this:
+//   VALIDATOR.renderValidateButton(i);
+//
+// That's it. Two lines total after sum-body.innerHTML=h.
+// =============================================================
+
 </script>
 </body>
 </html>
